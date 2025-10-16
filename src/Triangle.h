@@ -4,67 +4,84 @@
 #include "Ray.h"
 #include "Plane.h"
 
-struct RayTriangleIntersection{
+struct RayTriangleIntersection
+{
     bool intersectionExists;
     float t;
-    float w0,w1,w2;
+    float w0, w1, w2;
     unsigned int tIndex;
     Vec3 intersection;
     Vec3 normal;
 };
 
-class Triangle {
+class Triangle
+{
 private:
-    Vec3 m_c[3] , m_normal;
+    Vec3 m_c[3], m_normal;
     float area;
+
 public:
     Triangle() {}
-    Triangle( Vec3 const & c0 , Vec3 const & c1 , Vec3 const & c2 ) {
+    Triangle(Vec3 const &c0, Vec3 const &c1, Vec3 const &c2)
+    {
         m_c[0] = c0;
         m_c[1] = c1;
         m_c[2] = c2;
         updateAreaAndNormal();
     }
-    void updateAreaAndNormal() {
-        Vec3 nNotNormalized = Vec3::cross( m_c[1] - m_c[0] , m_c[2] - m_c[0] );
+    void updateAreaAndNormal()
+    {
+        Vec3 nNotNormalized = Vec3::cross(m_c[1] - m_c[0], m_c[2] - m_c[0]);
         float norm = nNotNormalized.length();
         m_normal = nNotNormalized / norm;
         area = norm / 2.f;
     }
-    void setC0( Vec3 const & c0 ) { m_c[0] = c0; } // remember to update the area and normal afterwards!
-    void setC1( Vec3 const & c1 ) { m_c[1] = c1; } // remember to update the area and normal afterwards!
-    void setC2( Vec3 const & c2 ) { m_c[2] = c2; } // remember to update the area and normal afterwards!
-    Vec3 const & normal() const { return m_normal; }
-    Vec3 projectOnSupportPlane( Vec3 const & p ) const {
-        Vec3 result;
-        //TODO completer
-        return result;
+    void setC0(Vec3 const &c0) { m_c[0] = c0; } // remember to update the area and normal afterwards!
+    void setC1(Vec3 const &c1) { m_c[1] = c1; } // remember to update the area and normal afterwards!
+    void setC2(Vec3 const &c2) { m_c[2] = c2; } // remember to update the area and normal afterwards!
+    Vec3 const &normal() const { return m_normal; }
+    Vec3 projectOnSupportPlane(Vec3 const &p) const
+    {
+        return Plane(m_c[0], m_normal).project(p);
     }
-    float squareDistanceToSupportPlane( Vec3 const & p ) const {
-        float result;
-        //TODO completer
-        return result;
+    float squareDistanceToSupportPlane(Vec3 const &p) const
+    {
+        return projectOnSupportPlane(p).squareLength();
     }
-    float distanceToSupportPlane( Vec3 const & p ) const { return sqrt( squareDistanceToSupportPlane(p) ); }
-    bool isParallelTo( Line const & L ) const {
-        bool result;
-        //TODO completer
-        return result;
+    float distanceToSupportPlane(Vec3 const &p) const
+    {
+        return sqrt(squareDistanceToSupportPlane(p));
     }
-    Vec3 getIntersectionPointWithSupportPlane( Line const & L ) const {
+    bool isParallelTo(Line const &L) const
+    {
+        return Vec3::dot(L.direction(), m_normal) == 0;
+    }
+    Vec3 getIntersectionPointWithSupportPlane(Line const &L) const
+    {
         // you should check first that the line is not parallel to the plane!
-        Vec3 result;
-        //TODO completer
+        Vec3 result = Vec3(NAN, NAN, NAN);
+        if (isParallelTo(L))
+        {
+            return result;
+        }
+        // TODO completer
+        
         return result;
     }
-    void computeBarycentricCoordinates( Vec3 const & p , float & u0 , float & u1 , float & u2 ) const {
-        //TODO Complete
+    void computeBarycentricCoordinates(Vec3 const &p, float &u0, float &u1, float &u2) const
+    {
+        // TODO Complete
     }
 
-    RayTriangleIntersection getIntersection( Ray const & ray ) const {
+    RayTriangleIntersection getIntersection(Ray const &ray) const
+    {
         RayTriangleIntersection result;
+        result.intersectionExists = false;
         // 1) check that the ray is not parallel to the triangle:
-
+        if (isParallelTo(ray))
+        {
+            return result;
+        }
         // 2) check that the triangle is "in front of" the ray:
 
         // 3) check that the intersection point is inside the triangle:

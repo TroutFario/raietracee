@@ -105,7 +105,8 @@ public:
             intersection.phi = NAN;
             return intersection;
         }
-        else if (delta == 0) {
+        else if (delta == 0)
+        {
             intersection.intersectionExists = true;
             intersection.t = -b / (2.f * a);
             intersection.intersection = ray.origin() + intersection.t * ray.direction();

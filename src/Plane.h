@@ -37,13 +37,24 @@ public:
     }
     Vec3 getIntersectionPoint(Line const &L) const
     {
-        if (isParallelTo(L))
+        if (this->isParallelTo(L))
         {
-            return Vec3(NAN);
+            return Vec3(NAN, NAN, NAN);
         }
-        Vec3 offsetFromCenter = L.origin() - m_center;
-        float t = Vec3::dot(offsetFromCenter, m_normal) / Vec3::dot(L.direction(), m_normal);
-        return L.origin() + L.direction() * t;
+
+        // N.(O + tD - C) = 0
+        // N.O + t(N.D) - N.C = 0
+        // t(N.D) = N.C - N.O
+        // t = (N.C - N.O)/N.D
+        // t = N.(C - O)/N.D
+
+        // X = O + tD
+
+        double t = (Vec3::dot(m_normal, m_center - L.origin())) / Vec3::dot(m_normal, L.direction());
+
+        Vec3 result = L.origin() + t * L.direction();
+
+        return result;
     }
 };
 #endif

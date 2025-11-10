@@ -65,7 +65,7 @@ public:
             return result;
         }
         // TODO completer
-        
+
         return result;
     }
     void computeBarycentricCoordinates(Vec3 const &p, float &u0, float &u1, float &u2) const

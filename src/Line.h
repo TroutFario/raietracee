@@ -24,9 +24,9 @@ public:
     Vec3 const &direction() const { return m_direction; }
     Vec3 project(Vec3 const &p) const
     {
-        Vec3 result = p - m_origin;
-        float t = Vec3::dot(result, m_direction);
-        return m_origin + t * m_direction;
+        float k = (-Vec3::dot(m_direction, p) + Vec3::dot(m_direction, m_origin));
+        Vec3 result = p + k * m_direction;
+        return result;
     }
     float squareDistance(Vec3 const &p) const
     {

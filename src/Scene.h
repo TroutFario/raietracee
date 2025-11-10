@@ -85,42 +85,42 @@ public:
     RaySceneIntersection computeIntersection(Ray const &ray)
     {
         RaySceneIntersection result;
-        result.intersectionExists = false;
         result.t = FLT_MAX;
+
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            RayTriangleIntersection intersection = meshes[i].intersect(ray);
+            if (intersection.intersectionExists && intersection.t < result.t && intersection.t > 4.8)
+            {
+                result.intersectionExists = true;
+                result.t = intersection.t;
+                result.rayMeshIntersection = intersection;
+                result.objectIndex = i;
+                result.typeOfIntersectedObject = MeshType;
+            }
+        }
         for (int i = 0; i < spheres.size(); i++)
         {
             RaySphereIntersection intersection = spheres[i].intersect(ray);
-            if (intersection.intersectionExists && intersection.t < result.t)
+            if (intersection.intersectionExists && intersection.t < result.t && intersection.t > 4.8)
             {
                 result.intersectionExists = true;
-                result.typeOfIntersectedObject = SphereType;
-                result.objectIndex = i;
                 result.t = intersection.t;
+                result.typeOfIntersectedObject = SphereType;
                 result.raySphereIntersection = intersection;
+                result.objectIndex = i;
             }
         }
         for (int i = 0; i < squares.size(); i++)
         {
             RaySquareIntersection intersection = squares[i].intersect(ray);
-            if (intersection.intersectionExists && intersection.t < result.t)
+            if (intersection.intersectionExists && intersection.t < result.t && intersection.t > 4.8)
             {
                 result.intersectionExists = true;
-                result.typeOfIntersectedObject = SquareType;
-                result.objectIndex = i;
                 result.t = intersection.t;
                 result.raySquareIntersection = intersection;
-            }
-        }
-        for (int i = 0; i < meshes.size(); i++)
-        {
-            RayTriangleIntersection intersection = meshes[i].intersect(ray);
-            if (intersection.intersectionExists && intersection.t < result.t)
-            {
-                result.intersectionExists = true;
-                result.typeOfIntersectedObject = MeshType;
                 result.objectIndex = i;
-                result.t = intersection.t;
-                result.rayMeshIntersection = intersection;
+                result.typeOfIntersectedObject = SquareType;
             }
         }
         return result;
@@ -132,12 +132,12 @@ public:
         if (raySceneIntersection.intersectionExists)
             switch (raySceneIntersection.typeOfIntersectedObject)
             {
+            case MeshType:
+                return meshes[raySceneIntersection.objectIndex].material.diffuse_material;
             case SphereType:
                 return spheres[raySceneIntersection.objectIndex].material.diffuse_material;
             case SquareType:
                 return squares[raySceneIntersection.objectIndex].material.diffuse_material;
-            case MeshType:
-                return meshes[raySceneIntersection.objectIndex].material.diffuse_material;
             default:
                 return Vec3(0.);
             }
@@ -146,9 +146,7 @@ public:
 
     Vec3 rayTrace(Ray const &rayStart)
     {
-        // TODO appeler la fonction recursive
-        Vec3 color = rayTraceRecursive(rayStart, 5);
-        return color;
+        return rayTraceRecursive(rayStart, 5);
     }
 
     void setup_single_sphere()
@@ -171,7 +169,7 @@ public:
         {
             spheres.resize(spheres.size() + 1);
             Sphere &s = spheres[spheres.size() - 1];
-            s.m_center = Vec3(0., 0., 0.);
+            s.m_center = Vec3(1., 0., 0.);
             s.m_radius = 1.f;
             s.build_arrays();
             s.material.type = Material_Mirror;

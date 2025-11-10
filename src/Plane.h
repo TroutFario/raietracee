@@ -39,10 +39,10 @@ public:
     {
         if (isParallelTo(L))
         {
-            return Vec3(NAN, NAN, NAN);
+            return Vec3(NAN);
         }
-        Vec3 result = L.origin() - m_center;
-        float t = Vec3::dot(result, m_normal) / Vec3::dot(L.direction(), m_normal);
+        Vec3 offsetFromCenter = L.origin() - m_center;
+        float t = Vec3::dot(offsetFromCenter, m_normal) / Vec3::dot(L.direction(), m_normal);
         return L.origin() + L.direction() * t;
     }
 };

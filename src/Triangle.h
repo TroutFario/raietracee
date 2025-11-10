@@ -59,7 +59,7 @@ public:
     Vec3 getIntersectionPointWithSupportPlane(Line const &L) const
     {
         // you should check first that the line is not parallel to the plane!
-        Vec3 result = Vec3(NAN, NAN, NAN);
+        Vec3 result = Vec3(NAN);
         if (isParallelTo(L))
         {
             return result;

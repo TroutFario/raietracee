@@ -9,6 +9,13 @@
 
 #include <GL/glut.h>
 
+enum ObjectType
+{
+    SphereType,
+    SquareType,
+    MeshType
+};
+
 enum LightType
 {
     LightType_Spherical,
@@ -34,7 +41,7 @@ struct Light
 struct RaySceneIntersection
 {
     bool intersectionExists;
-    unsigned int typeOfIntersectedObject;
+    ObjectType typeOfIntersectedObject;
     unsigned int objectIndex;
     float t;
     RayTriangleIntersection rayMeshIntersection;
@@ -78,22 +85,69 @@ public:
     RaySceneIntersection computeIntersection(Ray const &ray)
     {
         RaySceneIntersection result;
-        // TODO calculer les intersections avec les objets de la scene et garder la plus proche
+        result.intersectionExists = false;
+        result.t = FLT_MAX;
+        for (int i = 0; i < spheres.size(); i++)
+        {
+            RaySphereIntersection intersection = spheres[i].intersect(ray);
+            if (intersection.intersectionExists && intersection.t < result.t)
+            {
+                result.intersectionExists = true;
+                result.typeOfIntersectedObject = SphereType;
+                result.objectIndex = i;
+                result.t = intersection.t;
+                result.raySphereIntersection = intersection;
+            }
+        }
+        for (int i = 0; i < squares.size(); i++)
+        {
+            RaySquareIntersection intersection = squares[i].intersect(ray);
+            if (intersection.intersectionExists && intersection.t < result.t)
+            {
+                result.intersectionExists = true;
+                result.typeOfIntersectedObject = SquareType;
+                result.objectIndex = i;
+                result.t = intersection.t;
+                result.raySquareIntersection = intersection;
+            }
+        }
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            RayTriangleIntersection intersection = meshes[i].intersect(ray);
+            if (intersection.intersectionExists && intersection.t < result.t)
+            {
+                result.intersectionExists = true;
+                result.typeOfIntersectedObject = MeshType;
+                result.objectIndex = i;
+                result.t = intersection.t;
+                result.rayMeshIntersection = intersection;
+            }
+        }
         return result;
     }
 
     Vec3 rayTraceRecursive(Ray ray, int NRemainingBounces)
     {
-
-        // TODO RaySceneIntersection raySceneIntersection = computeIntersection(ray);
-        Vec3 color;
-        return color;
+        RaySceneIntersection raySceneIntersection = computeIntersection(ray);
+        if (raySceneIntersection.intersectionExists)
+            switch (raySceneIntersection.typeOfIntersectedObject)
+            {
+            case SphereType:
+                return spheres[raySceneIntersection.objectIndex].material.diffuse_material;
+            case SquareType:
+                return squares[raySceneIntersection.objectIndex].material.diffuse_material;
+            case MeshType:
+                return meshes[raySceneIntersection.objectIndex].material.diffuse_material;
+            default:
+                return Vec3(0.);
+            }
+        return Vec3(0.);
     }
 
     Vec3 rayTrace(Ray const &rayStart)
     {
         // TODO appeler la fonction recursive
-        Vec3 color;
+        Vec3 color = rayTraceRecursive(rayStart, 5);
         return color;
     }
 

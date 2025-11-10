@@ -89,7 +89,56 @@ public:
     RaySphereIntersection intersect(const Ray &ray) const
     {
         RaySphereIntersection intersection;
-        // TODO calcul l'intersection rayon sphere
+        float a = ray.direction().squareNorm();
+        float b = 2.f * (Vec3::dot(ray.origin(), ray.direction()) - Vec3::dot(ray.direction(), m_center));
+        float c = ray.origin().squareNorm() + m_center.squareNorm() - 2.f * Vec3::dot(ray.origin(), m_center) - m_radius * m_radius;
+        float delta = b * b - 4.f * a * c;
+
+        if (delta < 0)
+        {
+            intersection.intersectionExists = false;
+            intersection.t = NAN;
+            intersection.intersection = Vec3(NAN);
+            intersection.secondintersection = Vec3(NAN);
+            intersection.normal = Vec3(NAN);
+            intersection.theta = NAN;
+            intersection.phi = NAN;
+            return intersection;
+        }
+        else if (delta == 0) {
+            intersection.intersectionExists = true;
+            intersection.t = -b / (2.f * a);
+            intersection.intersection = ray.origin() + intersection.t * ray.direction();
+            intersection.secondintersection = intersection.intersection;
+            intersection.normal = intersection.intersection - m_center;
+            Vec3 tpR = EuclideanCoordinatesToSpherical(intersection.normal);
+            intersection.theta = tpR[0];
+            intersection.phi = tpR[1];
+            intersection.normal.normalize();
+        }
+        else
+        {
+            intersection.intersectionExists = true;
+            float t1 = (-b - sqrt(delta)) / (2.f * a);
+            float t2 = (-b + sqrt(delta)) / (2.f * a);
+            if (t1 < t2)
+            {
+                intersection.t = t1;
+                intersection.intersection = ray.origin() + t1 * ray.direction();
+                intersection.secondintersection = ray.origin() + t2 * ray.direction();
+            }
+            else
+            {
+                intersection.t = t2;
+                intersection.intersection = ray.origin() + t2 * ray.direction();
+                intersection.secondintersection = ray.origin() + t1 * ray.direction();
+            }
+            intersection.normal = intersection.intersection - m_center;
+            Vec3 tpR = EuclideanCoordinatesToSpherical(intersection.normal);
+            intersection.theta = tpR[0];
+            intersection.phi = tpR[1];
+            intersection.normal.normalize();
+        }
         return intersection;
     }
 };

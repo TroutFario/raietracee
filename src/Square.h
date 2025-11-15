@@ -93,14 +93,7 @@ public:
         double x = Vec3::dot(inter_to_origin, m_right_vector) / m_right_vector.squareNorm();
         double y = Vec3::dot(inter_to_origin, m_up_vector) / m_up_vector.squareNorm();
 
-        if (x >= 0 && x <= 1 && y >= 0 && y <= 1)
-        {
-            intersection.intersectionExists = true;
-        }
-        else
-        {
-            intersection.intersectionExists = false;
-        }
+        intersection.intersectionExists = x >= 0 && x <= 1 && y >= 0 && y <= 1 && Vec3::dot(ray.direction(), m_normal) < 0;
 
         intersection.normal = m_normal;
         intersection.u = x;

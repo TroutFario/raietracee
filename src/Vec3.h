@@ -67,6 +67,10 @@ public:
         mVals[1] += other[1];
         mVals[2] += other[2];
     }
+    Vec3 operator-() const
+    {
+        return Vec3(-mVals[0], -mVals[1], -mVals[2]);
+    }
     void operator-=(Vec3 const &other)
     {
         mVals[0] -= other[0];
@@ -78,6 +82,10 @@ public:
         mVals[0] *= s;
         mVals[1] *= s;
         mVals[2] *= s;
+    }
+    Vec3 operator*(Vec3 v)
+    {
+        return Vec3(mVals[0] * v[0], mVals[1] * v[1], mVals[2] * v[2]);
     }
     void operator/=(float s)
     {

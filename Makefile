@@ -62,7 +62,7 @@ veryclean: clean
 dep:
 	gcc $(CPPFLAGS) -MM $(SRCS)
 
-# liste des d�pendances g�n�r�e par 'make dep'
+# liste des dépendances générée par 'make dep'
 src/Camera.o: src/Camera.cpp src/Camera.h src/Vec3.h src/Trackball.h
 main.o: main.cpp src/Vec3.h src/Camera.h src/Trackball.h src/Scene.h src/Sphere.h \
 	src/Material.h src/Plane.h src/Square.h src/Triangle.h src/Mesh.h \

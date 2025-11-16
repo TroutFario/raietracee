@@ -31,7 +31,7 @@ struct Material
         type = Material_Diffuse_Blinn_Phong;
         transparency = 0.0;
         index_medium = 1.0;
-        ambient_material = Vec3(0., 0., 0.);
+        ambient_material = Vec3(0.0);
     }
 };
 

@@ -1,11 +1,11 @@
-# Makefile pour un unique ex�cutable
+# Makefile pour un unique exécutable
 
-# liste des variables � renseigner
+# liste des variables à renseigner
 #   CIBLE : nom du programme ( $(CIBLE).c doit contenir main() )
 #   SRCS : ensemble des fichiers sources 
-#   LIBS : liste des biblioth�ques utiles � l'�dition des liens 
+#   LIBS : liste des bibliothèques utiles à l'édition des liens 
 #          (format : -lnom1 -lnom2 ...) 
-#   PREFIX : chemin de la hi�rarchie 
+#   PREFIX : chemin de la hiérarchie 
 #
 # NE PAS OUBLIER D'AJOUTER LA LISTE DES DEPENDANCES A LA FIN DU FICHIER
 
@@ -29,15 +29,15 @@ CXXFLAGS = -Wall -O3
 # option du preprocesseur
 CPPFLAGS =  -I$(INCDIR) 
 
-# options du linker et liste des biblioth�ques � charger
+# options du linker et liste des bibliothèques à charger
 LDFLAGS = -L/usr/X11R6/lib              
 LDLIBS = -L$(LIBDIR) $(LIBS)  
 
-# construire la liste des fichiers objets une nouvelle chaine � partir
+# construire la liste des fichiers objets une nouvelle chaine à partir
 # de SRCS en substituant les occurences de ".c" par ".o" 
 OBJS = $(SRCS:.cpp=.o)   
 
-# cible par d�faut
+# cible par défaut
 $(CIBLE): $(OBJS)
 	$(CPP) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 

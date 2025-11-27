@@ -35,6 +35,8 @@ using namespace std;
 
 #include "src/Material.h"
 
+#define SAMPLES 500
+
 // -------------------------------------------
 // OpenGL/GLUT application code.
 // -------------------------------------------
@@ -177,11 +179,11 @@ void ray_trace_from_camera()
     std::cout << "Ray tracing a " << w << " x " << h << " image" << std::endl;
     camera.apply();
     Vec3 pos, dir;
-    //    unsigned int nsamples = 100;
-    unsigned int nsamples = 50;
+    unsigned int nsamples = SAMPLES;
     std::vector<Vec3> image(w * h, Vec3(0, 0, 0));
     for (int y = 0; y < h; y++)
     {
+        std::cout << "\r\tRendering... " << (int)((float)y / h * 100) << "% done " << std::flush;
         for (int x = 0; x < w; x++)
         {
             for (unsigned int s = 0; s < nsamples; ++s)
@@ -196,6 +198,7 @@ void ray_trace_from_camera()
             image[x + y * w] /= nsamples;
         }
     }
+    std::cout << "\r\tRendering... 100% done " << std::endl;
     std::cout << "\tDone" << std::endl;
 
     std::string filename = "./rendu.ppm";

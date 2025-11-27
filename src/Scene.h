@@ -134,11 +134,21 @@ class Scene {
         Vec3 V = -ray.direction();
         V.normalize();
 
-        // Vec3 color = Vec3(0.f);
         Vec3 color = material.ambient_material * 0.1f;
-
+        // float shadow_factor = 1.;
+        // const int iterations = 10;
+        // const float diff = shadow_factor / (float)iterations;
         for (const Light& light : lights) {
-            Vec3 L = light.pos - P;
+            const Vec3 oldL = light.pos - P;
+            // for (int i = 0; i < iterations; ++i) {
+            const float theta = rand() / (float)RAND_MAX * 2.f * M_PI;
+            const float phi = rand() / (float)RAND_MAX * 2.f * M_PI;
+            const float rho =
+                sqrt(rand() / (float)RAND_MAX) * light.radius * 0.5;
+            Vec3 viveLaLumiere =
+                Vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi)) *
+                rho;
+            Vec3 L = oldL + viveLaLumiere;
             float distance_to_light = L.length();
             L.normalize();
 
@@ -149,7 +159,6 @@ class Scene {
             if (shadowIntersection.intersectionExists &&
                 shadowIntersection.t < distance_to_light)
                 continue;
-
             // Composante diffuse
             float NdotL = std::max(0.0f, Vec3::dot(N, L));
             Vec3 diffuse = material.diffuse_material * light.material * NdotL;
@@ -161,7 +170,10 @@ class Scene {
             Vec3 specular = material.specular_material * light.material *
                             std::pow(RdotV, material.shininess);
 
-            color = color + diffuse + specular;
+            // shadow_factor -= diff;
+
+            color = color + (diffuse + specular) /* * shadow_factor */;
+            //}
         }
 
         return color;

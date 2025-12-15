@@ -376,36 +376,6 @@ class Scene {
             s.material.index_medium = 0.;
         }
     }
-
-    void setup_mesh_scene() {
-        meshes.clear();
-        spheres.clear();
-        squares.clear();
-        lights.clear();
-
-        {
-            lights.resize(lights.size() + 1);
-            Light& light = lights[lights.size() - 1];
-            light.pos = Vec3(-5, 5, 5);
-            light.radius = 2.5f;
-            light.powerCorrection = 2.f;
-            light.type = LightType_Spherical;
-            light.material = Vec3(1);
-            light.isInCamSpace = false;
-        }
-
-        {
-            meshes.resize(meshes.size() + 1);
-            Mesh& m = meshes[meshes.size() - 1];
-            m.loadOFF("meshes/avion_n.off");
-            m.centerAndScaleToUnit();
-            m.recomputeNormals();
-            m.build_arrays();
-            m.material.diffuse_material = Vec3(0.8, 0.7, 0.6);
-            m.material.specular_material = Vec3(0.3, 0.3, 0.3);
-            m.material.shininess = 16;
-        }
-    }
 };
 
 #endif

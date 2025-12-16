@@ -3,8 +3,8 @@
 
 #include <GL/glut.h>
 
-#include <algorithm>
 #include <cfloat>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -59,9 +59,9 @@ struct AABB {
 
 struct BVHNode {
     AABB box;
-    int left, right;    // indices des fils (-1 si feuille)
-    int firstTriIndex;  // premier triangle si feuille
-    int numTriangles;   // nombre de triangles si feuille
+    int left, right;       // indices des fils (-1 si feuille)
+    int firstTriIndex;     // premier triangle si feuille
+    int numTriangles;      // nombre de triangles si feuille
 
     BVHNode() : left(-1), right(-1), firstTriIndex(0), numTriangles(0) {}
     bool isLeaf() const { return left == -1; }
@@ -164,6 +164,13 @@ class Mesh {
 
     Material material;
 
+    // BVH members
+    std::vector<BVHNode> bvhNodes;
+    std::vector<unsigned int> triangleIndices;
+    bool useBVH;
+
+    Mesh() : useBVH(false) {}
+
     void openOFF(const std::string& filename, bool load_normals = false,
                  float scale = 1.0);
     void recomputeNormals();
@@ -176,9 +183,118 @@ class Mesh {
         build_normals_array();
         build_UVs_array();
         build_triangles_array();
+        if (triangles.size() > 64) {
+            buildBVH();
+        }
+    }
+
+    void buildBVH() {
+        useBVH = false;
+        bvhNodes.clear();
+        triangleIndices.resize(triangles.size());
+        for (size_t i = 0; i < triangles.size(); i++) {
+            triangleIndices[i] = i;
+        }
+        bvhNodes.reserve(triangles.size() * 2);
+        buildBVHRecursive(0, triangles.size());
+    }
+
+   private:
+    int buildBVHRecursive(int start, int end) {
+        BVHNode node;
+        
+        // Calcul de la bounding box
+        for (int i = start; i < end; i++) {
+            unsigned int triIdx = triangleIndices[i];
+            const MeshTriangle& tri = triangles[triIdx];
+            node.box.expand(vertices[tri.v[0]].position);
+            node.box.expand(vertices[tri.v[1]].position);
+            node.box.expand(vertices[tri.v[2]].position);
+        }
+
+        int numTris = end - start;
+        
+        // Si petit nombre de triangles, créer une feuille
+        if (numTris <= 4) {
+            node.firstTriIndex = start;
+            node.numTriangles = numTris;
+            node.left = node.right = -1;
+            int nodeIdx = bvhNodes.size();
+            bvhNodes.push_back(node);
+            return nodeIdx;
+        }
+
+        // Sinon, subdiviser
+        Vec3 extent = node.box.max - node.box.min;
+        int axis = 0;
+        if (extent[1] > extent[0]) axis = 1;
+        if (extent[2] > extent[axis]) axis = 2;
+
+        // Tri selon l'axe
+        std::sort(triangleIndices.begin() + start, 
+                  triangleIndices.begin() + end,
+                  [this, axis](unsigned int a, unsigned int b) {
+                      Vec3 ca = (vertices[triangles[a].v[0]].position +
+                                vertices[triangles[a].v[1]].position +
+                                vertices[triangles[a].v[2]].position) / 3.0f;
+                      Vec3 cb = (vertices[triangles[b].v[0]].position +
+                                vertices[triangles[b].v[1]].position +
+                                vertices[triangles[b].v[2]].position) / 3.0f;
+                      return ca[axis] < cb[axis];
+                  });
+
+        int mid = start + numTris / 2;
+        int nodeIdx = bvhNodes.size();
+        bvhNodes.push_back(node);
+        
+        bvhNodes[nodeIdx].left = buildBVHRecursive(start, mid);
+        bvhNodes[nodeIdx].right = buildBVHRecursive(mid, end);
+        
+        return nodeIdx;
+    }
+
+    bool intersectBVH(const Ray& ray, int nodeIdx, RayTriangleIntersection& closestIntersection) const {
+        const BVHNode& node = bvhNodes[nodeIdx];
+        
+        float tmin = 0.001f, tmax = closestIntersection.t;
+        if (!node.box.intersect(ray, tmin, tmax)) {
+            return false;
+        }
+
+        if (node.isLeaf()) {
+            bool found = false;
+            float triangleScaling = 1.000001;
+            Triangle triangle;
+            
+            for (int i = 0; i < node.numTriangles; i++) {
+                unsigned int triIdx = triangleIndices[node.firstTriIndex + i];
+                const MeshTriangle& tri = triangles[triIdx];
+                
+                Vec3 c0 = vertices[tri.v[0]].position * triangleScaling;
+                Vec3 c1 = vertices[tri.v[1]].position * triangleScaling;
+                Vec3 c2 = vertices[tri.v[2]].position * triangleScaling;
+                triangle = Triangle(c0, c1, c2);
+                
+                RayTriangleIntersection intersection = triangle.getIntersection(ray);
+                intersection.tIndex = triIdx;
+                
+                if (intersection.intersectionExists && 
+                    intersection.t < closestIntersection.t) {
+                    closestIntersection = intersection;
+                    found = true;
+                }
+            }
+            return found;
+        }
+
+        bool hitLeft = intersectBVH(ray, node.left, closestIntersection);
+        bool hitRight = intersectBVH(ray, node.right, closestIntersection);
+        
+        return hitLeft || hitRight;
     }
 
    public:
+
     void translate(Vec3 const& translation) {
         for (unsigned int v = 0; v < vertices.size(); ++v) {
             vertices[v].position += translation;
@@ -253,12 +369,21 @@ class Mesh {
     }
 
     RayTriangleIntersection intersect(Ray const& ray) const {
+        if (useBVH && !bvhNodes.empty()) {
+            return intersect_with_BVH(ray);
+        } else {
+            return intersect_naive(ray);
+        }
+    }
+
+    // Méthode naïve : parcours de tous les triangles
+    RayTriangleIntersection intersect_naive(Ray const& ray) const {
         RayTriangleIntersection closestIntersection;
         closestIntersection.t = FLT_MAX;
-
+        
         float triangleScaling = 1.000001;
         Triangle triangle;
-
+        
         for (unsigned int t = 0; t < triangles.size(); ++t) {
             unsigned int v0Index = triangles[t].v[0];
             unsigned int v1Index = triangles[t].v[1];
@@ -267,8 +392,7 @@ class Mesh {
             Vec3 c1 = vertices[v1Index].position * triangleScaling;
             Vec3 c2 = vertices[v2Index].position * triangleScaling;
             triangle = Triangle(c0, c1, c2);
-            RayTriangleIntersection intersection =
-                triangle.getIntersection(ray);
+            RayTriangleIntersection intersection = triangle.getIntersection(ray);
             intersection.tIndex = t;
             if (intersection.intersectionExists &&
                 intersection.t < closestIntersection.t) {
@@ -293,7 +417,39 @@ class Mesh {
                 smoothNormal = -smoothNormal;
 
             closestIntersection.normal = smoothNormal;
-            // closestIntersection.normal = triangle.normal();
+        }
+
+        return closestIntersection;
+    }
+
+    // Méthode avec BVH : accélération par structure hiérarchique
+    RayTriangleIntersection intersect_with_BVH(Ray const& ray) const {
+        RayTriangleIntersection closestIntersection;
+        closestIntersection.t = FLT_MAX;
+
+        if (!bvhNodes.empty()) {
+            intersectBVH(ray, 0, closestIntersection);
+        }
+
+        if (closestIntersection.intersectionExists) {
+            const MeshTriangle& tri = triangles[closestIntersection.tIndex];
+
+            const Vec3& n0 = vertices[tri.v[0]].normal;
+            const Vec3& n1 = vertices[tri.v[1]].normal;
+            const Vec3& n2 = vertices[tri.v[2]].normal;
+
+            float w0 = closestIntersection.w0;
+            float w1 = closestIntersection.w1;
+            float w2 = closestIntersection.w2;
+
+            Vec3 smoothNormal = w0 * n0 + w1 * n1 + w2 * n2;
+
+            smoothNormal.normalize();
+
+            if (Vec3::dot(smoothNormal, ray.direction()) > 0.0f)
+                smoothNormal = -smoothNormal;
+
+            closestIntersection.normal = smoothNormal;
         }
 
         return closestIntersection;

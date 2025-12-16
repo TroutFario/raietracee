@@ -14,26 +14,25 @@
 // purpose.
 // -------------------------------------------
 
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <string>
-#include <cstdio>
-#include <cstdlib>
-
-#include <algorithm>
-#include "src/Vec3.h"
-#include "src/Camera.h"
-#include "src/Scene.h"
 #include <GL/glut.h>
 
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include "src/Camera.h"
+#include "src/Scene.h"
+#include "src/Vec3.h"
 #include "src/matrixUtilities.h"
 
 using namespace std;
 
-#include "src/imageLoader.h"
-
 #include "src/Material.h"
+#include "src/imageLoader.h"
 
 #define SAMPLES 500
 
@@ -57,8 +56,7 @@ unsigned int selected_scene;
 
 std::vector<std::pair<Vec3, Vec3>> rays;
 
-void printUsage()
-{
+void printUsage() {
     cerr << endl
          << "gMini: a minimal OpenGL/GLUT application" << endl
          << "for 3D graphics." << endl
@@ -78,15 +76,13 @@ void printUsage()
          << endl;
 }
 
-void usage()
-{
+void usage() {
     printUsage();
     exit(EXIT_FAILURE);
 }
 
 // ------------------------------------
-void initLight()
-{
+void initLight() {
     GLfloat light_position[4] = {0.0, 1.5, 0.0, 1.0};
     GLfloat color[4] = {1.0, 1.0, 1.0, 1.0};
     GLfloat ambient[4] = {1.0, 1.0, 1.0, 1.0};
@@ -99,8 +95,7 @@ void initLight()
     glEnable(GL_LIGHTING);
 }
 
-void init()
-{
+void init() {
     camera.resize(SCREENWIDTH, SCREENHEIGHT);
     initLight();
     // glCullFace (GL_BACK);
@@ -116,17 +111,14 @@ void init()
 // closing sockets, etc.
 // ------------------------------------
 
-void clear()
-{
-}
+void clear() {}
 
 // ------------------------------------
 // Replace the code of this
 // functions for alternative rendering.
 // ------------------------------------
 
-void draw()
-{
+void draw() {
     glEnable(GL_LIGHTING);
     scenes[selected_scene].draw();
 
@@ -137,16 +129,14 @@ void draw()
     glLineWidth(6);
     glColor3f(1, 0, 0);
     glBegin(GL_LINES);
-    for (unsigned int r = 0; r < rays.size(); ++r)
-    {
+    for (unsigned int r = 0; r < rays.size(); ++r) {
         glVertex3f(rays[r].first[0], rays[r].first[1], rays[r].first[2]);
         glVertex3f(rays[r].second[0], rays[r].second[1], rays[r].second[2]);
     }
     glEnd();
 }
 
-void display()
-{
+void display() {
     glLoadIdentity();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     camera.apply();
@@ -155,14 +145,12 @@ void display()
     glutSwapBuffers();
 }
 
-void idle()
-{
+void idle() {
     static float lastTime = glutGet((GLenum)GLUT_ELAPSED_TIME);
     static unsigned int counter = 0;
     counter++;
     float currentTime = glutGet((GLenum)GLUT_ELAPSED_TIME);
-    if (currentTime - lastTime >= 1000.0f)
-    {
+    if (currentTime - lastTime >= 1000.0f) {
         FPS = counter;
         counter = 0;
         static char winTitle[64];
@@ -173,23 +161,22 @@ void idle()
     glutPostRedisplay();
 }
 
-void ray_trace_from_camera()
-{
+void ray_trace_from_camera() {
     int w = glutGet(GLUT_WINDOW_WIDTH), h = glutGet(GLUT_WINDOW_HEIGHT);
     std::cout << "Ray tracing a " << w << " x " << h << " image" << std::endl;
     camera.apply();
     Vec3 pos, dir;
     unsigned int nsamples = SAMPLES;
     std::vector<Vec3> image(w * h, Vec3(0, 0, 0));
-    for (int y = 0; y < h; y++)
-    {
-        std::cout << "\r\tRendering... " << (int)((float)y / h * 100) << "% done " << std::flush;
-        for (int x = 0; x < w; x++)
-        {
-            for (unsigned int s = 0; s < nsamples; ++s)
-            {
-                float u = ((float)(x) + (float)(rand()) / (float)(RAND_MAX)) / w;
-                float v = ((float)(y) + (float)(rand()) / (float)(RAND_MAX)) / h;
+    for (int y = 0; y < h; y++) {
+        std::cout << "\r\tRendering... (" << y << "/" << h << "), "
+                  << (int)((float)y / h * 100) << "% done" << std::flush;
+        for (int x = 0; x < w; x++) {
+            for (unsigned int s = 0; s < nsamples; ++s) {
+                float u =
+                    ((float)(x) + (float)(rand()) / (float)(RAND_MAX)) / w;
+                float v =
+                    ((float)(y) + (float)(rand()) / (float)(RAND_MAX)) / h;
                 // this is a random uv that belongs to the pixel xy.
                 screen_space_to_world_space_ray(u, v, pos, dir);
                 Vec3 color = scenes[selected_scene].rayTrace(Ray(pos, dir));
@@ -203,97 +190,80 @@ void ray_trace_from_camera()
 
     std::string filename = "./rendu.ppm";
     ofstream f(filename.c_str(), ios::binary);
-    if (f.fail())
-    {
+    if (f.fail()) {
         cout << "Could not open file: " << filename << endl;
         return;
     }
-    f << "P3" << std::endl
-      << w << " " << h << std::endl
-      << 255 << std::endl;
+    f << "P3" << std::endl << w << " " << h << std::endl << 255 << std::endl;
     for (int i = 0; i < w * h; i++)
-        f << (int)(255.f * std::min<float>(1.f, image[i][0])) << " " << (int)(255.f * std::min<float>(1.f, image[i][1])) << " " << (int)(255.f * std::min<float>(1.f, image[i][2])) << " ";
+        f << (int)(255.f * std::min<float>(1.f, image[i][0])) << " "
+          << (int)(255.f * std::min<float>(1.f, image[i][1])) << " "
+          << (int)(255.f * std::min<float>(1.f, image[i][2])) << " ";
     f << std::endl;
     f.close();
 }
 
-void key(unsigned char keyPressed, int x, int y)
-{
+void key(unsigned char keyPressed, int x, int y) {
     Vec3 pos, dir;
-    switch (keyPressed)
-    {
-    case 'f':
-        if (fullScreen == true)
-        {
-            glutReshapeWindow(SCREENWIDTH, SCREENHEIGHT);
-            fullScreen = false;
-        }
-        else
-        {
-            glutFullScreen();
-            fullScreen = true;
-        }
-        break;
-    case 'q':
-    case 27:
-        clear();
-        exit(0);
-        break;
-    case 'w':
-        GLint polygonMode[2];
-        glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-        if (polygonMode[0] != GL_FILL)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        else
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        break;
+    switch (keyPressed) {
+        case 'f':
+            if (fullScreen == true) {
+                glutReshapeWindow(SCREENWIDTH, SCREENHEIGHT);
+                fullScreen = false;
+            } else {
+                glutFullScreen();
+                fullScreen = true;
+            }
+            break;
+        case 'q':
+        case 27:
+            clear();
+            exit(0);
+            break;
+        case 'w':
+            GLint polygonMode[2];
+            glGetIntegerv(GL_POLYGON_MODE, polygonMode);
+            if (polygonMode[0] != GL_FILL)
+                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            else
+                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            break;
 
-    case 'r':
-        camera.apply();
-        rays.clear();
-        ray_trace_from_camera();
-        break;
-    case '+':
-        selected_scene++;
-        if (selected_scene >= scenes.size())
-            selected_scene = 0;
-        break;
-    default:
-        printUsage();
-        break;
+        case 'r':
+            camera.apply();
+            rays.clear();
+            ray_trace_from_camera();
+            break;
+        case '+':
+            selected_scene++;
+            if (selected_scene >= scenes.size()) selected_scene = 0;
+            break;
+        default:
+            printUsage();
+            break;
     }
     idle();
 }
 
-void mouse(int button, int state, int x, int y)
-{
-    if (state == GLUT_UP)
-    {
+void mouse(int button, int state, int x, int y) {
+    if (state == GLUT_UP) {
         mouseMovePressed = false;
         mouseRotatePressed = false;
         mouseZoomPressed = false;
-    }
-    else
-    {
-        if (button == GLUT_LEFT_BUTTON)
-        {
+    } else {
+        if (button == GLUT_LEFT_BUTTON) {
             camera.beginRotate(x, y);
             mouseMovePressed = false;
             mouseRotatePressed = true;
             mouseZoomPressed = false;
-        }
-        else if (button == GLUT_RIGHT_BUTTON)
-        {
+        } else if (button == GLUT_RIGHT_BUTTON) {
             lastX = x;
             lastY = y;
             mouseMovePressed = true;
             mouseRotatePressed = false;
             mouseZoomPressed = false;
-        }
-        else if (button == GLUT_MIDDLE_BUTTON)
-        {
-            if (mouseZoomPressed == false)
-            {
+        } else if (button == GLUT_MIDDLE_BUTTON) {
+            if (mouseZoomPressed == false) {
                 lastZoom = y;
                 mouseMovePressed = false;
                 mouseRotatePressed = false;
@@ -304,34 +274,24 @@ void mouse(int button, int state, int x, int y)
     idle();
 }
 
-void motion(int x, int y)
-{
-    if (mouseRotatePressed == true)
-    {
+void motion(int x, int y) {
+    if (mouseRotatePressed == true) {
         camera.rotate(x, y);
-    }
-    else if (mouseMovePressed == true)
-    {
-        camera.move((x - lastX) / static_cast<float>(SCREENWIDTH), (lastY - y) / static_cast<float>(SCREENHEIGHT), 0.0);
+    } else if (mouseMovePressed == true) {
+        camera.move((x - lastX) / static_cast<float>(SCREENWIDTH),
+                    (lastY - y) / static_cast<float>(SCREENHEIGHT), 0.0);
         lastX = x;
         lastY = y;
-    }
-    else if (mouseZoomPressed == true)
-    {
+    } else if (mouseZoomPressed == true) {
         camera.zoom(float(y - lastZoom) / SCREENHEIGHT);
         lastZoom = y;
     }
 }
 
-void reshape(int w, int h)
-{
-    camera.resize(w, h);
-}
+void reshape(int w, int h) { camera.resize(w, h); }
 
-int main(int argc, char **argv)
-{
-    if (argc > 2)
-    {
+int main(int argc, char** argv) {
+    if (argc > 2) {
         printUsage();
         exit(EXIT_FAILURE);
     }
@@ -351,10 +311,11 @@ int main(int argc, char **argv)
 
     camera.move(0., 0., -3.1);
     selected_scene = 0;
-    scenes.resize(3);
+    scenes.resize(4);
     scenes[0].setup_single_sphere();
     scenes[1].setup_single_square();
     scenes[2].setup_cornell_box();
+    scenes[3].setup_mesh_scene();
 
     glutMainLoop();
     return EXIT_SUCCESS;

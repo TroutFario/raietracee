@@ -10,6 +10,9 @@
 #include "Sphere.h"
 #include "Square.h"
 
+#define DEFAULT_COLOR Vec3(1.f)
+#define REMAXING_BOUNCES 5
+
 enum ObjectType { SphereType, SquareType, MeshType };
 
 enum LightType { LightType_Spherical, LightType_Quad };
@@ -107,7 +110,7 @@ class Scene {
 
     Vec3 rayTraceRecursive(Ray ray, int NRemainingBounces) {
         RaySceneIntersection raySceneIntersection = computeIntersection(ray);
-        if (!raySceneIntersection.intersectionExists) return Vec3(0.);
+        if (!raySceneIntersection.intersectionExists) return DEFAULT_COLOR;
 
         Vec3 P = ray.origin() + raySceneIntersection.t * ray.direction();
         Vec3 N = Vec3(0.);
@@ -121,6 +124,8 @@ class Scene {
             case SphereType:
                 N = raySceneIntersection.raySphereIntersection.normal;
                 material = spheres[raySceneIntersection.objectIndex].material;
+                if (material.type == Material_Glass && NRemainingBounces > 0) {
+                }
                 break;
             case SquareType:
                 N = raySceneIntersection.raySquareIntersection.normal;
@@ -130,24 +135,34 @@ class Scene {
                 return Vec3(0.);
         }
 
+        if (material.type == Material_Mirror && NRemainingBounces > 0) {
+            Vec3 R = ray.direction() - 2.f * Vec3::dot(ray.direction(), N) * N;
+            R.normalize();
+            Ray reflectedRay(P + N * 0.001f, R);
+            return rayTraceRecursive(reflectedRay, NRemainingBounces - 1);
+        }
+
+        if (material.type == Material_Glass && NRemainingBounces > 0) {
+            return rayTraceRecursive(
+                raySceneIntersection.raySphereIntersection.secondintersection,
+                NRemainingBounces - 1);
+        }
+
         N.normalize();
         Vec3 V = -ray.direction();
         V.normalize();
 
         Vec3 color = material.ambient_material * 0.1f;
-        // float shadow_factor = 1.;
-        // const int iterations = 10;
-        // const float diff = shadow_factor / (float)iterations;
         for (const Light& light : lights) {
             const Vec3 oldL = light.pos - P;
-            // for (int i = 0; i < iterations; ++i) {
             const float theta = rand() / (float)RAND_MAX * 2.f * M_PI;
             const float phi = rand() / (float)RAND_MAX * 2.f * M_PI;
             const float rho =
                 sqrt(rand() / (float)RAND_MAX) * light.radius * 0.5;
             Vec3 viveLaLumiere =
-                Vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi)) *
-                rho;
+                Vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi))
+                * rho;
+                // Vec3(0.f);
             Vec3 L = oldL + viveLaLumiere;
             float distance_to_light = L.length();
             L.normalize();
@@ -170,17 +185,33 @@ class Scene {
             Vec3 specular = material.specular_material * light.material *
                             std::pow(RdotV, material.shininess);
 
-            // shadow_factor -= diff;
-
-            color = color + (diffuse + specular) /* * shadow_factor */;
-            //}
+            color = color + (diffuse + specular);
         }
 
         return color;
     }
 
+    Vec3 rayTraceRecursive_phase1(Ray ray, int NRemainingBounces) {
+        RaySceneIntersection raySceneIntersection = computeIntersection(ray);
+        if (raySceneIntersection.intersectionExists)
+            switch (raySceneIntersection.typeOfIntersectedObject) {
+                case MeshType:
+                    return meshes[raySceneIntersection.objectIndex]
+                        .material.diffuse_material;
+                case SphereType:
+                    return spheres[raySceneIntersection.objectIndex]
+                        .material.diffuse_material;
+                case SquareType:
+                    return squares[raySceneIntersection.objectIndex]
+                        .material.diffuse_material;
+                default:
+                    return Vec3(0., 0., 0.);
+            }
+        return Vec3(0., 0., 0.);
+    }
+
     Vec3 rayTrace(Ray const& rayStart) {
-        return rayTraceRecursive(rayStart, 5);
+        return rayTraceRecursive(rayStart, REMAXING_BOUNCES);
     }
 
     void setup_single_sphere() {
@@ -206,7 +237,6 @@ class Scene {
             s.m_center = Vec3(1., 0., 0.);
             s.m_radius = 1.f;
             s.build_arrays();
-            s.material.type = Material_Mirror;
             s.material.diffuse_material = Vec3(1., 0., 0.);
             s.material.specular_material = Vec3(0.2);
             s.material.shininess = 20;
@@ -217,7 +247,6 @@ class Scene {
             s2.m_center = Vec3(-1., 0., 0.);
             s2.m_radius = 1.f;
             s2.build_arrays();
-            s2.material.type = Material_Mirror;
             s2.material.diffuse_material = Vec3(0., 1., 0.);
             s2.material.specular_material = Vec3(0.2);
             s2.material.shininess = 20;
@@ -359,7 +388,7 @@ class Scene {
             s.material.shininess = 16;
         }
 
-        {  // GLASS Sphere
+        {  // MIRRORED Sphere
 
             spheres.resize(spheres.size() + 1);
             Sphere& s = spheres[spheres.size() - 1];
@@ -370,22 +399,60 @@ class Scene {
             s.material.diffuse_material = Vec3(1., 0., 0.);
             s.material.specular_material = Vec3(1., 0., 0.);
             s.material.shininess = 16;
-            s.material.transparency = 1.0;
-            s.material.index_medium = 1.4;
+            s.material.transparency = 0.;
+            s.material.index_medium = 0.;
         }
 
-        {  // MIRRORED Sphere
+        {  // GLASS Sphere
             spheres.resize(spheres.size() + 1);
             Sphere& s = spheres[spheres.size() - 1];
             s.m_center = Vec3(-1.0, -1.25, -0.5);
             s.m_radius = 0.75f;
             s.build_arrays();
-            s.material.type = Material_Glass;
+            // s.material.type = Material_Mirror;
+            // s.material.type = Material_Glass;
             s.material.diffuse_material = Vec3(0., 0., 1.);
             s.material.specular_material = Vec3(1., 1., 1.);
             s.material.shininess = 16;
-            s.material.transparency = 0.;
-            s.material.index_medium = 0.;
+            s.material.transparency = 1.0;
+            s.material.index_medium = 1.5;
+        }
+
+        // {
+        //     meshes.resize(meshes.size() + 1);
+        //     Mesh& mesh = meshes[meshes.size() - 1];
+        //     mesh.openOFF("assets/elephant_n.off", true, 2);
+        //     // mesh.material.type = Material_Mirror;
+        //     mesh.material.diffuse_material = Vec3(1., 0., 0.);
+        //     mesh.material.specular_material = Vec3(1., 0., 0.);
+        //     mesh.material.shininess = 16;
+        // }
+    }
+
+    void setup_mesh_scene() {
+        meshes.clear();
+        spheres.clear();
+        squares.clear();
+        lights.clear();
+
+        {
+            lights.resize(lights.size() + 1);
+            Light& light = lights[lights.size() - 1];
+            light.pos = Vec3(-5, 5, 5);
+            light.radius = 2.5f;
+            light.powerCorrection = 2.f;
+            light.type = LightType_Spherical;
+            light.material = Vec3(1);
+            light.isInCamSpace = false;
+        }
+
+        {
+            meshes.resize(meshes.size() + 1);
+            Mesh& mesh = meshes[meshes.size() - 1];
+            mesh.openOFF("assets/elephant_n.off", true, 3);
+            mesh.material.diffuse_material = Vec3(1., 0., 0.);
+            mesh.material.specular_material = Vec3(1., 0., 0.);
+            mesh.material.shininess = 16;
         }
     }
 };

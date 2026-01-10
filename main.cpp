@@ -168,10 +168,10 @@ void ray_trace_from_camera() {
     Vec3 pos, dir;
     unsigned int nsamples = SAMPLES;
     std::vector<Vec3> image(w * h, Vec3(0, 0, 0));
-    for (int y = 0; y < h; y++) {
+    for (int y = 0; y < h; ++y) {
         std::cout << "\r\tRendering... (" << y << "/" << h << "), "
                   << (int)((float)y / h * 100) << "% done" << std::flush;
-        for (int x = 0; x < w; x++) {
+        for (int x = 0; x < w; ++x) {
             for (unsigned int s = 0; s < nsamples; ++s) {
                 float u =
                     ((float)(x) + (float)(rand()) / (float)(RAND_MAX)) / w;
@@ -188,14 +188,19 @@ void ray_trace_from_camera() {
     std::cout << "\r\tRendering... 100% done " << std::endl;
     std::cout << "\tDone" << std::endl;
 
-    std::string filename = "./rendu.ppm";
+    std::string directory = "./rendus";
+    std::string filename = directory + "/rendu.ppm";
+    
+    // Create directory if it doesn't exist
+    system("mkdir -p ./rendus");
+    
     ofstream f(filename.c_str(), ios::binary);
     if (f.fail()) {
         cout << "Could not open file: " << filename << endl;
         return;
     }
     f << "P3" << std::endl << w << " " << h << std::endl << 255 << std::endl;
-    for (int i = 0; i < w * h; i++)
+    for (int i = 0; i < w * h; ++i)
         f << (int)(255.f * std::min<float>(1.f, image[i][0])) << " "
           << (int)(255.f * std::min<float>(1.f, image[i][1])) << " "
           << (int)(255.f * std::min<float>(1.f, image[i][2])) << " ";
@@ -235,7 +240,7 @@ void key(unsigned char keyPressed, int x, int y) {
             ray_trace_from_camera();
             break;
         case '+':
-            selected_scene++;
+            ++selected_scene;
             if (selected_scene >= scenes.size()) selected_scene = 0;
             break;
         default:

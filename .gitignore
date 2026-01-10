@@ -1,2 +1,6 @@
 rendus
 rendu.ppm
+/build/
+/out/
+/main
+*.o

@@ -52,6 +52,30 @@ class Scene {
    public:
     Scene() {}
 
+   private:
+    // Calcule la direction réfractée selon la loi de Snell.
+    bool refractDir(const Vec3& I, const Vec3& N_in, float ior, Vec3& T) const {
+        Vec3 N = N_in;
+        float n1 = 1.0f;
+        float n2 = ior;
+        float cosi = std::max(-1.0f, std::min(1.0f, Vec3::dot(I, N)));
+        if (cosi > 0.0f) {
+            // À l'intérieur: inverse la normale et échange les indices
+            N = -N;
+            std::swap(n1, n2);
+            cosi = -cosi;
+        }
+        float eta = n1 / n2;
+        float k = 1.0f - eta * eta * (1.0f - cosi * cosi);
+        if (k < 0.0f) {
+            return false;  // réflexion totale interne
+        }
+        T = eta * I - (eta * cosi + sqrtf(k)) * N;
+        T.normalize();
+        return true;
+    }
+
+   public:
     void draw() {
         // iterer sur l'ensemble des objets, et faire leur rendu :
         for (unsigned int It = 0; It < meshes.size(); ++It) {
@@ -72,7 +96,7 @@ class Scene {
         RaySceneIntersection result;
         result.t = FLT_MAX;
 
-        for (int i = 0; i < meshes.size(); i++) {
+        for (int i = 0; i < meshes.size(); ++i) {
             RayTriangleIntersection intersection = meshes[i].intersect(ray);
             if (intersection.intersectionExists && intersection.t < result.t &&
                 intersection.t > 0.001) {
@@ -83,7 +107,7 @@ class Scene {
                 result.typeOfIntersectedObject = MeshType;
             }
         }
-        for (int i = 0; i < spheres.size(); i++) {
+        for (int i = 0; i < spheres.size(); ++i) {
             RaySphereIntersection intersection = spheres[i].intersect(ray);
             if (intersection.intersectionExists && intersection.t < result.t &&
                 intersection.t > 0.001) {
@@ -94,7 +118,7 @@ class Scene {
                 result.objectIndex = i;
             }
         }
-        for (int i = 0; i < squares.size(); i++) {
+        for (int i = 0; i < squares.size(); ++i) {
             RaySquareIntersection intersection = squares[i].intersect(ray);
             if (intersection.intersectionExists && intersection.t < result.t &&
                 intersection.t > 0.001) {
@@ -124,8 +148,6 @@ class Scene {
             case SphereType:
                 N = raySceneIntersection.raySphereIntersection.normal;
                 material = spheres[raySceneIntersection.objectIndex].material;
-                if (material.type == Material_Glass && NRemainingBounces > 0) {
-                }
                 break;
             case SquareType:
                 N = raySceneIntersection.raySquareIntersection.normal;
@@ -143,9 +165,37 @@ class Scene {
         }
 
         if (material.type == Material_Glass && NRemainingBounces > 0) {
-            return rayTraceRecursive(
-                raySceneIntersection.raySphereIntersection.secondintersection,
-                NRemainingBounces - 1);
+            if (raySceneIntersection.typeOfIntersectedObject == SphereType) {
+                return rayTraceRecursive(
+                    raySceneIntersection.raySphereIntersection
+                        .secondintersection,
+                    NRemainingBounces - 1);
+            } else {
+                Vec3 T;
+                bool canRefract =
+                    refractDir(ray.direction(), N, material.index_medium, T);
+                if (canRefract) {
+                    Vec3 P =
+                        ray.origin() + raySceneIntersection.t * ray.direction();
+                    Vec3 offset = (Vec3::dot(ray.direction(), N) < 0.0f)
+                                      ? -N * 0.001f
+                                      : N * 0.001f;
+                    Ray refractedRay(P + offset, T);
+                    return rayTraceRecursive(refractedRay,
+                                             NRemainingBounces - 1);
+                } else {
+                    // Fallback: réflexion
+                    Vec3 R = ray.direction() -
+                             2.f * Vec3::dot(ray.direction(), N) * N;
+                    R.normalize();
+                    Ray reflectedRay((ray.origin() + raySceneIntersection.t *
+                                                         ray.direction()) +
+                                         N * 0.001f,
+                                     R);
+                    return rayTraceRecursive(reflectedRay,
+                                             NRemainingBounces - 1);
+                }
+            }
         }
 
         N.normalize();
@@ -160,9 +210,8 @@ class Scene {
             const float rho =
                 sqrt(rand() / (float)RAND_MAX) * light.radius * 0.5;
             Vec3 viveLaLumiere =
-                Vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi))
-                * rho;
-                // Vec3(0.f);
+                Vec3(cos(theta) * cos(phi), sin(theta) * cos(phi), sin(phi)) *
+                rho;
             Vec3 L = oldL + viveLaLumiere;
             float distance_to_light = L.length();
             L.normalize();
@@ -388,8 +437,23 @@ class Scene {
             s.material.shininess = 16;
         }
 
-        {  // MIRRORED Sphere
+        {  // MIRRORED middle
+            squares.resize(squares.size() + 1);
+            Square& s = squares[squares.size() - 1];
+            s.setQuad(Vec3(-.9, -.9, 0.), Vec3(.9, 0, 0.), Vec3(0., .9, 0.), 2.,
+                      2.);
+            s.translate(Vec3(0., 0., 1.9));
+            // s.scale(Vec3(2., 2., 1.));
+            s.rotate_y(180);
+            s.rotate_x(20);
+            s.build_arrays();
+            s.material.type = Material_Mirror;
+            s.material.diffuse_material = Vec3(1.0, 1.0, 1.0);
+            s.material.specular_material = Vec3(1.0, 1.0, 1.0);
+            s.material.shininess = 16;
+        }
 
+        {  // MIRRORED Sphere
             spheres.resize(spheres.size() + 1);
             Sphere& s = spheres[spheres.size() - 1];
             s.m_center = Vec3(1.0, -1.25, 0.5);
@@ -409,8 +473,7 @@ class Scene {
             s.m_center = Vec3(-1.0, -1.25, -0.5);
             s.m_radius = 0.75f;
             s.build_arrays();
-            // s.material.type = Material_Mirror;
-            // s.material.type = Material_Glass;
+            s.material.type = Material_Glass;
             s.material.diffuse_material = Vec3(0., 0., 1.);
             s.material.specular_material = Vec3(1., 1., 1.);
             s.material.shininess = 16;
@@ -418,15 +481,17 @@ class Scene {
             s.material.index_medium = 1.5;
         }
 
-        // {
-        //     meshes.resize(meshes.size() + 1);
-        //     Mesh& mesh = meshes[meshes.size() - 1];
-        //     mesh.openOFF("assets/elephant_n.off", true, 2);
-        //     // mesh.material.type = Material_Mirror;
-        //     mesh.material.diffuse_material = Vec3(1., 0., 0.);
-        //     mesh.material.specular_material = Vec3(1., 0., 0.);
-        //     mesh.material.shininess = 16;
-        // }
+        {  // Mesh
+            meshes.resize(meshes.size() + 1);
+            Mesh& mesh = meshes[meshes.size() - 1];
+            mesh.openOFF("assets/elephant_n.off", true, 2);
+            mesh.material.type = Material_Glass;
+            mesh.material.diffuse_material = Vec3(1., 0., 0.);
+            mesh.material.specular_material = Vec3(1., 0., 0.);
+            mesh.material.shininess = 16;
+            mesh.material.transparency = 1.0;
+            mesh.material.index_medium = 1.8;
+        }
     }
 
     void setup_mesh_scene() {

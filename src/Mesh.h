@@ -38,7 +38,7 @@ struct AABB {
     }
 
     bool intersect(const Ray& ray, float& tmin, float& tmax) const {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; ++i) {
             float invD = 1.0f / ray.direction()[i];
             float t0 = (min[i] - ray.origin()[i]) * invD;
             float t1 = (max[i] - ray.origin()[i]) * invD;
@@ -59,16 +59,15 @@ struct AABB {
 
 struct BVHNode {
     AABB box;
-    int left, right;    // indices des fils (-1 si feuille)
-    int firstTriIndex;  // premier triangle si feuille
-    int numTriangles;   // nombre de triangles si feuille
+    int left, right;              // indices des fils (-1 si feuille)
+    std::vector<int> triIndices;  // triangles contenus si feuille
 
-    BVHNode() : left(-1), right(-1), firstTriIndex(0), numTriangles(0) {}
+    BVHNode() : left(-1), right(-1) {}
     bool isLeaf() const { return left == -1; }
 };
 
 // -------------------------------------------
-// Basic Mesh class
+// Mesh classes
 // -------------------------------------------
 
 struct MeshVertex {
@@ -154,6 +153,7 @@ class Mesh {
     }
 
    public:
+    // membres :
     std::vector<MeshVertex> vertices;
     std::vector<MeshTriangle> triangles;
 
@@ -161,6 +161,99 @@ class Mesh {
     std::vector<float> normalsArray;
     std::vector<float> uvs_array;
     std::vector<unsigned int> triangles_array;
+
+    // KD-tree ========================
+    std::vector<BVHNode> bvhNodes;  // tableau de noeuds
+    int rootNodeIndex = -1;         // index du noeud racine dans bvhNodes
+    int maxTrianglesPerLeaf = 4;    // combien de triangles par feuille
+    int maxDepth = 32;              // sécurité pour profondeur max
+
+    AABB computeTriangleAABB(const MeshTriangle& tri) const {
+        const Vec3& c0 = vertices[tri.v[0]].position;
+        const Vec3& c1 = vertices[tri.v[1]].position;
+        const Vec3& c2 = vertices[tri.v[2]].position;
+        AABB box;
+        box.expand(c0);
+        box.expand(c1);
+        box.expand(c2);
+        return box;
+    }
+
+    int buildBVHRecursive(std::vector<int>& triangleIndices, int depth) {
+        BVHNode node;
+
+        // Calculer la bounding box de ce noeud
+        for (int idx : triangleIndices) {
+            node.box.expand(computeTriangleAABB(triangles[idx]));
+        }
+
+        // Condition d'arrêt => feuille
+        if (triangleIndices.size() <= maxTrianglesPerLeaf ||
+            depth >= maxDepth) {
+            node.triIndices = triangleIndices;
+            bvhNodes.push_back(node);
+            return bvhNodes.size() - 1;
+        }
+
+        // Choisir l'axe de split
+        Vec3 extent = node.box.max - node.box.min;
+        int axis = 0;
+        if (extent[1] > extent[0]) axis = 1;
+        if (extent[2] > extent[axis]) axis = 2;
+
+        // Plan au milieu
+        float splitPos = 0.5f * (node.box.min[axis] + node.box.max[axis]);
+
+        // Partitionner les triangles (sans duplication, sinon la taille ne
+        // décroît jamais et le BVH explose en mémoire).
+        std::vector<int> leftTris, rightTris;
+        leftTris.reserve(triangleIndices.size());
+        rightTris.reserve(triangleIndices.size());
+        for (int idx : triangleIndices) {
+            const MeshTriangle& tri = triangles[idx];
+            const Vec3 c0 = vertices[tri.v[0]].position;
+            const Vec3 c1 = vertices[tri.v[1]].position;
+            const Vec3 c2 = vertices[tri.v[2]].position;
+
+            float centroid = (c0[axis] + c1[axis] + c2[axis]) / 3.0f;
+            if (centroid <= splitPos)
+                leftTris.push_back(idx);
+            else
+                rightTris.push_back(idx);
+        }
+
+        // Si une des partitions est vide (tous les triangles du même côté),
+        // on force un split équilibré pour éviter la récursion infinie.
+        if (leftTris.empty() || rightTris.empty()) {
+            leftTris.clear();
+            rightTris.clear();
+            size_t mid = triangleIndices.size() / 2;
+            leftTris.insert(leftTris.end(), triangleIndices.begin(),
+                            triangleIndices.begin() + mid);
+            rightTris.insert(rightTris.end(), triangleIndices.begin() + mid,
+                             triangleIndices.end());
+        }
+
+        int nodeIndex = bvhNodes.size();
+        bvhNodes.push_back(node);  // noeud temporaire
+
+        int leftChild = buildBVHRecursive(leftTris, depth + 1);
+        int rightChild = buildBVHRecursive(rightTris, depth + 1);
+
+        bvhNodes[nodeIndex].left = leftChild;
+        bvhNodes[nodeIndex].right = rightChild;
+
+        return nodeIndex;
+    }
+
+    void buildBVH() {
+        bvhNodes.clear();
+        std::vector<int> allTriangles(triangles.size());
+        for (size_t i = 0; i < triangles.size(); ++i) allTriangles[i] = i;
+        rootNodeIndex = buildBVHRecursive(allTriangles, 0);
+    }
+
+    // ================================
 
     Material material;
 
@@ -172,6 +265,7 @@ class Mesh {
 
     virtual void build_arrays() {
         recomputeNormals();
+        buildBVH();
         build_positions_array();
         build_normals_array();
         build_UVs_array();
@@ -252,7 +346,7 @@ class Mesh {
                        (GLvoid*)(triangles_array.data()));
     }
 
-    RayTriangleIntersection intersect(Ray const& ray) const {
+    RayTriangleIntersection intersectNaif(Ray const& ray) const {
         RayTriangleIntersection closestIntersection;
         closestIntersection.t = FLT_MAX;
 
@@ -267,8 +361,7 @@ class Mesh {
             Vec3 c1 = vertices[v1Index].position * triangleScaling;
             Vec3 c2 = vertices[v2Index].position * triangleScaling;
             triangle = Triangle(c0, c1, c2);
-            RayTriangleIntersection intersection =
-                triangle.getIntersection(ray);
+            RayTriangleIntersection intersection = triangle.getIntersection(ray);
             intersection.tIndex = t;
             if (intersection.intersectionExists &&
                 intersection.t < closestIntersection.t) {
@@ -298,5 +391,71 @@ class Mesh {
 
         return closestIntersection;
     }
+
+    RayTriangleIntersection intersectBVH(const Ray& ray, int nodeIndex) const {
+        RayTriangleIntersection closestHit;
+        closestHit.t = FLT_MAX;
+
+        if (nodeIndex < 0) return closestHit;
+        const BVHNode& node = bvhNodes[nodeIndex];
+
+        float tmin = 0.0f, tmax = FLT_MAX;
+        if (!node.box.intersect(ray, tmin, tmax)) return closestHit;
+
+        if (node.isLeaf()) {
+            for (int triIndex : node.triIndices) {
+                const MeshTriangle& tri = triangles[triIndex];
+                Triangle triangle(vertices[tri.v[0]].position, vertices[tri.v[1]].position, vertices[tri.v[2]].position);
+                RayTriangleIntersection hit = triangle.getIntersection(ray);
+                hit.tIndex = triIndex;
+
+                if (hit.intersectionExists && hit.t < closestHit.t)
+                    closestHit = hit;
+            }
+            return closestHit;
+        }
+
+        RayTriangleIntersection leftHit = intersectBVH(ray, node.left);
+        RayTriangleIntersection rightHit = intersectBVH(ray, node.right);
+
+        if (leftHit.intersectionExists && leftHit.t < rightHit.t)
+            return leftHit;
+        else
+            return rightHit;
+    }
+
+    RayTriangleIntersection intersect(const Ray& ray) const {
+        RayTriangleIntersection intersection = intersectBVH(ray, rootNodeIndex);
+
+        if (intersection.intersectionExists) {
+            const MeshTriangle& tri = triangles[intersection.tIndex];
+            const Vec3& n0 = vertices[tri.v[0]].normal;
+            const Vec3& n1 = vertices[tri.v[1]].normal;
+            const Vec3& n2 = vertices[tri.v[2]].normal;
+
+            float w0 = intersection.w0;
+            float w1 = intersection.w1;
+            float w2 = intersection.w2;
+
+            Vec3 smoothNormal = w0 * n0 + w1 * n1 + w2 * n2;
+            smoothNormal.normalize();
+
+            if (Vec3::dot(smoothNormal, ray.direction()) > 0.0f)
+                smoothNormal = -smoothNormal;
+
+            intersection.normal = smoothNormal;
+        }
+
+        if (material.type != Material_Glass) return intersection;
+
+        // Gestion du matériau verre avec une seconde intersection
+
+        Plane plane(intersection.intersection, intersection.normal);
+        Ray refractedRay = plane.getRefractedRay(
+            material, intersection.intersection, ray.direction());
+        intersection.secondIntersection = refractedRay;
+        return intersection;
+    }
 };
+
 #endif

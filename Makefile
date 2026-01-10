@@ -14,9 +14,14 @@ SRCS =  src/Camera.cpp main.cpp src/Trackball.cpp src/imageLoader.cpp src/Mesh.c
 LIBS =  -lglut -lGLU -lGL -lm -lpthread 
 #########################################################"
 
+BUILDDIR ?= build
+OBJDIR ?= $(BUILDDIR)/obj
+BINDIR ?= $(BUILDDIR)
+PREFIX ?= $(HOME)/.local
+INSTALLBIN ?= $(PREFIX)/bin
+
 INCDIR = .
 LIBDIR = .
-BINDIR = .
 
 # nom du compilateur
 CC = g++
@@ -35,18 +40,29 @@ LDLIBS = -L$(LIBDIR) $(LIBS)
 
 # construire la liste des fichiers objets une nouvelle chaine à partir
 # de SRCS en substituant les occurences de ".c" par ".o" 
-OBJS = $(SRCS:.cpp=.o)   
+OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
 
-# cible par défaut
-$(CIBLE): $(OBJS)
+.PHONY: all clean veryclean install installdirs dep
+
+all: $(BINDIR)/$(CIBLE)
+
+$(BINDIR)/$(CIBLE): $(OBJS) | $(BINDIR)
 	$(CPP) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 
 # règle pour compiler les fichiers .cpp en .o
-%.o: %.cpp
+$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+	mkdir -p $(dir $@)
 	$(CPP) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
-install:  $(CIBLE)
-	cp $(CIBLE) $(BINDIR)/
+$(BINDIR):
+	mkdir -p $@
+
+$(OBJDIR):
+	mkdir -p $@
+
+install: $(BINDIR)/$(CIBLE)
+	install -d $(INSTALLBIN)
+	install $(BINDIR)/$(CIBLE) $(INSTALLBIN)/
 
 installdirs:
 	test -d $(INCDIR) || mkdir $(INCDIR)
@@ -54,7 +70,7 @@ installdirs:
 	test -d $(BINDIR) || mkdir $(BINDIR)
 
 clean:
-	rm -f  *~  $(CIBLE) $(OBJS)
+	rm -rf $(BUILDDIR) *~ $(CIBLE) $(OBJS)
 
 veryclean: clean
 	rm -f $(BINDIR)/$(CIBLE)
@@ -63,12 +79,13 @@ dep:
 	gcc $(CPPFLAGS) -MM $(SRCS)
 
 # liste des dépendances générée par 'make dep'
-src/Camera.o: src/Camera.cpp src/Camera.h src/Vec3.h src/Trackball.h
-main.o: main.cpp src/Vec3.h src/Camera.h src/Trackball.h src/Scene.h src/Sphere.h \
-	src/Material.h src/Plane.h src/Square.h src/Triangle.h src/Mesh.h \
-	src/Ray.h src/Line.h src/imageLoader.h
-src/Trackball.o: src/Trackball.cpp src/Trackball.h
-src/imageLoader.o: src/imageLoader.cpp src/imageLoader.h src/Vec3.h
-src/Mesh.o: src/Mesh.cpp src/Mesh.h src/Vec3.h src/Triangle.h src/Material.h
+$(OBJDIR)/src/Camera.o: src/Camera.cpp src/Camera.h src/Vec3.h src/Trackball.h
+$(OBJDIR)/main.o: main.cpp src/Camera.h src/Vec3.h src/Trackball.h src/Scene.h \
+ src/Mesh.h src/Material.h src/imageLoader.h src/Ray.h src/Line.h \
+ src/Triangle.h src/Plane.h src/Sphere.h src/Square.h src/matrixUtilities.h
+$(OBJDIR)/src/Trackball.o: src/Trackball.cpp src/Trackball.h
+$(OBJDIR)/src/imageLoader.o: src/imageLoader.cpp src/imageLoader.h src/Vec3.h
+$(OBJDIR)/src/Mesh.o: src/Mesh.cpp src/Mesh.h src/Material.h src/Vec3.h \
+ src/imageLoader.h src/Ray.h src/Line.h src/Triangle.h src/Plane.h
 
 

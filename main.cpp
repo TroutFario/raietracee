@@ -20,16 +20,20 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include "src/Camera.h"
 #include "src/Scene.h"
+#include "src/Scenes.h"
 #include "src/Vec3.h"
 #include "src/matrixUtilities.h"
 
 using namespace std;
+
+#include <format>
 
 #include "src/Material.h"
 #include "src/imageLoader.h"
@@ -164,13 +168,15 @@ void idle() {
 void ray_trace_from_camera() {
     int w = glutGet(GLUT_WINDOW_WIDTH), h = glutGet(GLUT_WINDOW_HEIGHT);
     std::cout << "Ray tracing a " << w << " x " << h << " image" << std::endl;
-    camera.apply();
     Vec3 pos, dir;
     unsigned int nsamples = SAMPLES;
     std::vector<Vec3> image(w * h, Vec3(0, 0, 0));
     for (int y = 0; y < h; ++y) {
-        std::cout << "\r\tRendering... (" << y << "/" << h << "), "
-                  << (int)((float)y / h * 100) << "% done" << std::flush;
+        static char winTitle[64];
+        sprintf(winTitle, "Raytracer - Rendering... (%d/%d), %.2f%% done", y, h, float(y) / h * 100);
+        glutSetWindowTitle(winTitle);
+        std::cout << std::format("\r\tRendering... ({}/{}), {:6.2f}% done", y, h, float(y) / h * 100) << std::flush;
+        camera.apply();
         for (int x = 0; x < w; ++x) {
             for (unsigned int s = 0; s < nsamples; ++s) {
                 float u =
@@ -185,21 +191,22 @@ void ray_trace_from_camera() {
             image[x + y * w] /= nsamples;
         }
     }
-    std::cout << "\r\tRendering... 100% done " << std::endl;
-    std::cout << "\tDone" << std::endl;
+    std::cout << std::format("\r\tRendering... ({}/{}), {:6.2f}% done", h, h, 100.0) << std::endl;
 
     std::string directory = "./rendus";
     std::string filename = directory + "/rendu.ppm";
-    
+
     // Create directory if it doesn't exist
     system("mkdir -p ./rendus");
-    
+
     ofstream f(filename.c_str(), ios::binary);
     if (f.fail()) {
         cout << "Could not open file: " << filename << endl;
         return;
     }
-    f << "P3" << std::endl << w << " " << h << std::endl << 255 << std::endl;
+    f << "P3" << std::endl
+      << w << " " << h << std::endl
+      << 255 << std::endl;
     for (int i = 0; i < w * h; ++i)
         f << (int)(255.f * std::min<float>(1.f, image[i][0])) << " "
           << (int)(255.f * std::min<float>(1.f, image[i][1])) << " "
@@ -238,6 +245,9 @@ void key(unsigned char keyPressed, int x, int y) {
             camera.apply();
             rays.clear();
             ray_trace_from_camera();
+            break;
+        case ' ':
+            camera.set(0., 0., -3.1);
             break;
         case '+':
             ++selected_scene;
@@ -317,10 +327,10 @@ int main(int argc, char** argv) {
     camera.move(0., 0., -3.1);
     selected_scene = 0;
     scenes.resize(4);
-    scenes[0].setup_single_sphere();
-    scenes[1].setup_single_square();
-    scenes[2].setup_cornell_box();
-    scenes[3].setup_mesh_scene();
+    Scenes::setup_single_sphere(scenes[0]);
+    Scenes::setup_single_square(scenes[1]);
+    Scenes::setup_cornell_box(scenes[2]);
+    Scenes::setup_mesh_scene(scenes[3]);
 
     glutMainLoop();
     return EXIT_SUCCESS;

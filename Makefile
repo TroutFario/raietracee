@@ -29,7 +29,7 @@ CPP = g++
 
 # options du compilateur          
 CFLAGS = -Wall -O3 
-CXXFLAGS = -Wall -O3 
+CXXFLAGS = -Wall -O3 -std=c++20 -march=native -mavx -ffast-math -funroll-loops
 
 # option du preprocesseur
 CPPFLAGS =  -I$(INCDIR) 
@@ -42,15 +42,18 @@ LDLIBS = -L$(LIBDIR) $(LIBS)
 # de SRCS en substituant les occurences de ".c" par ".o" 
 OBJS = $(SRCS:%.cpp=$(OBJDIR)/%.o)
 
-.PHONY: all clean veryclean install installdirs dep
+.PHONY: all clean veryclean install installdirs dep run
 
 all: $(BINDIR)/$(CIBLE)
+
+run: $(BINDIR)/$(CIBLE)
+	./$(BINDIR)/$(CIBLE)
 
 $(BINDIR)/$(CIBLE): $(OBJS) | $(BINDIR)
 	$(CPP) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 
 # règle pour compiler les fichiers .cpp en .o
-$(OBJDIR)/%.o: %.cpp | $(OBJDIR)
+$(OBJDIR)/%.o: %.cpp Makefile | $(OBJDIR)
 	mkdir -p $(dir $@)
 	$(CPP) $(CXXFLAGS) $(CPPFLAGS) -c $< -o $@
 
@@ -81,7 +84,7 @@ dep:
 # liste des dépendances générée par 'make dep'
 $(OBJDIR)/src/Camera.o: src/Camera.cpp src/Camera.h src/Vec3.h src/Trackball.h
 $(OBJDIR)/main.o: main.cpp src/Camera.h src/Vec3.h src/Trackball.h src/Scene.h \
- src/Mesh.h src/Material.h src/imageLoader.h src/Ray.h src/Line.h \
+ src/Scenes.h src/Mesh.h src/Material.h src/imageLoader.h src/Ray.h src/Line.h \
  src/Triangle.h src/Plane.h src/Sphere.h src/Square.h src/matrixUtilities.h
 $(OBJDIR)/src/Trackball.o: src/Trackball.cpp src/Trackball.h
 $(OBJDIR)/src/imageLoader.o: src/imageLoader.cpp src/imageLoader.h src/Vec3.h

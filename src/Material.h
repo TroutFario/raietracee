@@ -11,7 +11,8 @@
 enum MaterialType {
     Material_Diffuse_Blinn_Phong,
     Material_Glass,
-    Material_Mirror
+    Material_Mirror,
+    Material_Texture
 };
 
 struct Material {

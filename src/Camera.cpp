@@ -96,6 +96,13 @@ void Camera::move(float dx, float dy, float dz)
   z += dz;
 }
 
+void Camera::set(float _x, float _y, float _z)
+{
+  x = _x;
+  y = _y;
+  z = _z;
+}
+
 void Camera::beginRotate(int u, int v)
 {
   beginu = u;

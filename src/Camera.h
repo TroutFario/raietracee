@@ -33,6 +33,7 @@ public:
   void initPos();
 
   void move(float dx, float dy, float dz);
+  void set(float _x, float _y, float _z);
   void beginRotate(int u, int v);
   void rotate(int u, int v);
   void endRotate();

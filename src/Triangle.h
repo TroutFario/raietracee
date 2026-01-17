@@ -6,6 +6,7 @@
 
 struct RayTriangleIntersection {
     bool intersectionExists;
+    bool isTransparent;
     float t;
     float w0, w1, w2;
     unsigned int tIndex;
@@ -14,8 +15,7 @@ struct RayTriangleIntersection {
     Ray secondIntersection;
 
     RayTriangleIntersection()
-        : intersectionExists(false), t(FLT_MAX), w0(0), w1(0), w2(0),
-          tIndex(0), intersection(Vec3(0)), normal(Vec3(0)), secondIntersection() {}
+        : intersectionExists(false), t(FLT_MAX), w0(0), w1(0), w2(0), tIndex(0), intersection(Vec3(0)), normal(Vec3(0)), secondIntersection() {}
 };
 
 class Triangle {

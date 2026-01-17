@@ -415,13 +415,49 @@ class Mesh {
             return closestHit;
         }
 
-        RayTriangleIntersection leftHit = intersectBVH(ray, node.left);
-        RayTriangleIntersection rightHit = intersectBVH(ray, node.right);
+        // On teste les AABB des enfants avant la récursion
+        float tminLeft = 0.0f, tmaxLeft = FLT_MAX;
+        float tminRight = 0.0f, tmaxRight = FLT_MAX;
+        bool hitLeft = (node.left >= 0) && bvhNodes[node.left].box.intersect(ray, tminLeft, tmaxLeft);
+        bool hitRight = (node.right >= 0) && bvhNodes[node.right].box.intersect(ray, tminRight, tmaxRight);
 
-        if (leftHit.intersectionExists && leftHit.t < rightHit.t)
-            return leftHit;
-        else
-            return rightHit;
+        // Si aucune intersection, retourner
+        if (!hitLeft && !hitRight) return closestHit;
+
+        // Déterminer l'ordre de traversée (tester le plus proche en premier)
+        int firstChild = -1, secondChild = -1;
+        float secondTmin = FLT_MAX;
+        
+        if (hitLeft && hitRight) {
+            if (tminLeft < tminRight) {
+                firstChild = node.left;
+                secondChild = node.right;
+                secondTmin = tminRight;
+            } else {
+                firstChild = node.right;
+                secondChild = node.left;
+                secondTmin = tminLeft;
+            }
+        } else if (hitLeft) {
+            firstChild = node.left;
+        } else {
+            firstChild = node.right;
+        }
+
+        // Tester le premier enfant
+        if (firstChild >= 0) {
+            closestHit = intersectBVH(ray, firstChild);
+        }
+
+        // Tester le second enfant seulement si son AABB est plus proche que l'intersection trouvée
+        if (secondChild >= 0 && secondTmin < closestHit.t) {
+            RayTriangleIntersection secondHit = intersectBVH(ray, secondChild);
+            if (secondHit.intersectionExists && secondHit.t < closestHit.t) {
+                closestHit = secondHit;
+            }
+        }
+
+        return closestHit;
     }
 
     RayTriangleIntersection intersect(const Ray& ray) const {
@@ -449,7 +485,6 @@ class Mesh {
         if (material.type != Material_Glass) return intersection;
 
         // Gestion du matériau verre avec une seconde intersection
-
         Plane plane(intersection.intersection, intersection.normal);
         Ray refractedRay = plane.getRefractedRay(
             material, intersection.intersection, ray.direction());

@@ -171,6 +171,7 @@ void ray_trace_from_camera() {
     Vec3 pos, dir;
     unsigned int nsamples = SAMPLES;
     std::vector<Vec3> image(w * h, Vec3(0, 0, 0));
+    time_t startTime = time(NULL);
     for (int y = 0; y < h; ++y) {
         static char winTitle[64];
         sprintf(winTitle, "Raytracer - Rendering... (%d/%d), %.2f%% done", y, h, float(y) / h * 100);
@@ -192,6 +193,8 @@ void ray_trace_from_camera() {
         }
     }
     std::cout << std::format("\r\tRendering... ({}/{}), {:6.2f}% done", h, h, 100.0) << std::endl;
+    time_t endTime = time(NULL);
+    std::cout << "Rendering time: " << difftime(endTime, startTime) << " seconds" << std::endl;
 
     std::string directory = "./rendus";
     std::string filename = directory + "/rendu.ppm";

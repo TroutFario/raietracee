@@ -194,38 +194,11 @@ class Scene {
                 return Vec3(DEFAULT_COLOR);
         }
 
-        if (material.type == Material_Mirror && NRemainingBounces > 0) {
-            Vec3 R = ray.direction() - 2.f * Vec3::dot(ray.direction(), N) * N;
-            R.normalize();
-            Ray reflectedRay(P + N * 0.001f, R);
-            return rayTraceRecursive(reflectedRay, NRemainingBounces - 1);
-        }
-
-        if (material.type == Material_Glass && NRemainingBounces > 0) {
-            if (raySceneIntersection.typeOfIntersectedObject == SphereType) {
-                return rayTraceRecursive(raySceneIntersection.raySphereIntersection.secondintersection, NRemainingBounces - 1);
-            } else {
-                Vec3 T;
-                bool canRefract = refractDir(ray.direction(), N, material.index_medium, T);
-                if (canRefract) {
-                    Vec3 P = ray.origin() + raySceneIntersection.t * ray.direction();
-                    Vec3 offset = (Vec3::dot(ray.direction(), N) < 0.0f) ? -N * 0.001f : N * 0.001f;
-                    Ray refractedRay(P + offset, T);
-                    return rayTraceRecursive(refractedRay, NRemainingBounces - 1);
-                } else {
-                    // Fallback: réflexion
-                    Vec3 R = ray.direction() - 2.f * Vec3::dot(ray.direction(), N) * N;
-                    R.normalize();
-                    Ray reflectedRay((ray.origin() + raySceneIntersection.t * ray.direction()) + N * 0.001f, R);
-                    return rayTraceRecursive(reflectedRay, NRemainingBounces - 1);
-                }
-            }
-        }
-
         N.normalize();
         Vec3 V = -ray.direction();
         V.normalize();
 
+        Vec3 specular = Vec3(0.f);
         Vec3 color = material.ambient_material * 0.1f;
         for (const Light& light : lights) {
             const Vec3 oldL = light.pos - P;
@@ -251,10 +224,37 @@ class Scene {
             Vec3 R = 2.0f * Vec3::dot(N, L) * N - L;
             R.normalize();
             float RdotV = std::max(0.0f, Vec3::dot(R, V));
-            Vec3 specular = material.specular_material * light.material *
-                            std::pow(RdotV, material.shininess);
+            specular += material.specular_material * light.material * std::pow(RdotV, material.shininess);
 
             color = color + (diffuse + specular);
+        }
+
+        if (material.type == Material_Mirror && NRemainingBounces > 0) {
+            Vec3 R = ray.direction() - 2.f * Vec3::dot(ray.direction(), N) * N;
+            R.normalize();
+            Ray reflectedRay(P + N * 0.001f, R);
+            return rayTraceRecursive(reflectedRay, NRemainingBounces - 1) + specular;
+        }
+
+        if (material.type == Material_Glass && NRemainingBounces > 0) {
+            if (raySceneIntersection.typeOfIntersectedObject == SphereType) {
+                return rayTraceRecursive(raySceneIntersection.raySphereIntersection.secondintersection, NRemainingBounces - 1) + specular;
+            } else {
+                Vec3 T;
+                bool canRefract = refractDir(ray.direction(), N, material.index_medium, T);
+                if (canRefract) {
+                    Vec3 P = ray.origin() + raySceneIntersection.t * ray.direction();
+                    Vec3 offset = (Vec3::dot(ray.direction(), N) < 0.0f) ? -N * 0.001f : N * 0.001f;
+                    Ray refractedRay(P + offset, T);
+                    return rayTraceRecursive(refractedRay, NRemainingBounces - 1) + specular;
+                } else {
+                    // Fallback: réflexion
+                    Vec3 R = ray.direction() - 2.f * Vec3::dot(ray.direction(), N) * N;
+                    R.normalize();
+                    Ray reflectedRay((ray.origin() + raySceneIntersection.t * ray.direction()) + N * 0.001f, R);
+                    return rayTraceRecursive(reflectedRay, NRemainingBounces - 1) + specular;
+                }
+            }
         }
 
         return color;

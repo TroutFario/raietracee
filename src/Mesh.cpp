@@ -78,7 +78,7 @@ void Mesh::openOFF(const std::string& filename, bool load_normals,
         recomputeNormals();
     }
 
-    build_arrays();
+    // build_arrays();
 }
 
 void Mesh::recomputeNormals() {

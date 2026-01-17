@@ -54,16 +54,20 @@ struct AABB {
 };
 
 // -------------------------------------------
-// BVH Node
+// KD-Tree Node
 // -------------------------------------------
 
-struct BVHNode {
+struct KDNode {
     AABB box;
-    int left, right;              // indices des fils (-1 si feuille)
-    std::vector<int> triIndices;  // triangles contenus si feuille
+    int left = -1;
+    int right = -1;
 
-    BVHNode() : left(-1), right(-1) {}
-    bool isLeaf() const { return left == -1; }
+    int axis = -1;       // axe de coupe (0=x,1=y,2=z)
+    float split = 0.0f;  // position du plan de coupe
+
+    std::vector<int> triIndices;  // triangles si feuille
+
+    bool isLeaf() const { return left == -1 && right == -1; }
 };
 
 // -------------------------------------------
@@ -163,10 +167,10 @@ class Mesh {
     std::vector<unsigned int> triangles_array;
 
     // KD-tree ========================
-    std::vector<BVHNode> bvhNodes;  // tableau de noeuds
-    int rootNodeIndex = -1;         // index du noeud racine dans bvhNodes
-    int maxTrianglesPerLeaf = 4;    // combien de triangles par feuille
-    int maxDepth = 32;              // sécurité pour profondeur max
+    std::vector<KDNode> kdNodes;
+    int rootNodeIndex = -1;
+    int maxTrianglesPerLeaf = 4;
+    int maxDepth = 32;
 
     AABB computeTriangleAABB(const MeshTriangle& tri) const {
         const Vec3& c0 = vertices[tri.v[0]].position;
@@ -179,78 +183,71 @@ class Mesh {
         return box;
     }
 
-    int buildBVHRecursive(std::vector<int>& triangleIndices, int depth) {
-        BVHNode node;
+    int buildKDTreeRecursive(std::vector<int>& triangleIndices, int depth) {
+        KDNode node;
 
-        // Calculer la bounding box de ce noeud
+        // Calcul AABB
         for (int idx : triangleIndices) {
             node.box.expand(computeTriangleAABB(triangles[idx]));
         }
 
-        // Condition d'arrêt => feuille
+        // Condition feuille
         if (triangleIndices.size() <= maxTrianglesPerLeaf ||
             depth >= maxDepth) {
             node.triIndices = triangleIndices;
-            bvhNodes.push_back(node);
-            return bvhNodes.size() - 1;
+            kdNodes.push_back(node);
+            return kdNodes.size() - 1;
         }
 
-        // Choisir l'axe de split
+        // Choix axe (plus grande extension)
         Vec3 extent = node.box.max - node.box.min;
         int axis = 0;
         if (extent[1] > extent[0]) axis = 1;
         if (extent[2] > extent[axis]) axis = 2;
 
-        // Plan au milieu
-        float splitPos = 0.5f * (node.box.min[axis] + node.box.max[axis]);
+        float split = 0.5f * (node.box.min[axis] + node.box.max[axis]);
 
-        // Partitionner les triangles (sans duplication, sinon la taille ne
-        // décroît jamais et le BVH explose en mémoire).
         std::vector<int> leftTris, rightTris;
         leftTris.reserve(triangleIndices.size());
         rightTris.reserve(triangleIndices.size());
+
         for (int idx : triangleIndices) {
-            const MeshTriangle& tri = triangles[idx];
-            const Vec3 c0 = vertices[tri.v[0]].position;
-            const Vec3 c1 = vertices[tri.v[1]].position;
-            const Vec3 c2 = vertices[tri.v[2]].position;
+            AABB triBox = computeTriangleAABB(triangles[idx]);
+            float centroid = triBox.centroid()[axis];
 
-            float centroid = (c0[axis] + c1[axis] + c2[axis]) / 3.0f;
-            if (centroid <= splitPos)
+            if (centroid < split) {
                 leftTris.push_back(idx);
-            else
+            } else {
                 rightTris.push_back(idx);
+            }
         }
 
-        // Si une des partitions est vide (tous les triangles du même côté),
-        // on force un split équilibré pour éviter la récursion infinie.
+        // Sécurité anti-récursion infinie
         if (leftTris.empty() || rightTris.empty()) {
-            leftTris.clear();
-            rightTris.clear();
-            size_t mid = triangleIndices.size() / 2;
-            leftTris.insert(leftTris.end(), triangleIndices.begin(),
-                            triangleIndices.begin() + mid);
-            rightTris.insert(rightTris.end(), triangleIndices.begin() + mid,
-                             triangleIndices.end());
+            node.triIndices = triangleIndices;
+            kdNodes.push_back(node);
+            return kdNodes.size() - 1;
         }
 
-        int nodeIndex = bvhNodes.size();
-        bvhNodes.push_back(node);  // noeud temporaire
+        node.axis = axis;
+        node.split = split;
 
-        int leftChild = buildBVHRecursive(leftTris, depth + 1);
-        int rightChild = buildBVHRecursive(rightTris, depth + 1);
+        int nodeIndex = kdNodes.size();
+        kdNodes.push_back(node);
 
-        bvhNodes[nodeIndex].left = leftChild;
-        bvhNodes[nodeIndex].right = rightChild;
+        kdNodes[nodeIndex].left = buildKDTreeRecursive(leftTris, depth + 1);
+        kdNodes[nodeIndex].right = buildKDTreeRecursive(rightTris, depth + 1);
 
         return nodeIndex;
     }
 
-    void buildBVH() {
-        bvhNodes.clear();
+    void buildKDTree() {
+        kdNodes.clear();
         std::vector<int> allTriangles(triangles.size());
-        for (size_t i = 0; i < triangles.size(); ++i) allTriangles[i] = i;
-        rootNodeIndex = buildBVHRecursive(allTriangles, 0);
+        for (size_t i = 0; i < triangles.size(); ++i)
+            allTriangles[i] = i;
+
+        rootNodeIndex = buildKDTreeRecursive(allTriangles, 0);
     }
 
     // ================================
@@ -265,7 +262,7 @@ class Mesh {
 
     virtual void build_arrays() {
         recomputeNormals();
-        buildBVH();
+        buildKDTree();
         build_positions_array();
         build_normals_array();
         build_UVs_array();
@@ -392,76 +389,62 @@ class Mesh {
         return closestIntersection;
     }
 
-    RayTriangleIntersection intersectBVH(const Ray& ray, int nodeIndex) const {
-        RayTriangleIntersection closestHit;
-        closestHit.t = FLT_MAX;
+    RayTriangleIntersection intersectKDTree(const Ray& ray, int nodeIndex) const {
+        RayTriangleIntersection closest;
+        closest.t = FLT_MAX;
 
-        if (nodeIndex < 0) return closestHit;
-        const BVHNode& node = bvhNodes[nodeIndex];
+        if (nodeIndex < 0) return closest;
+        const KDNode& node = kdNodes[nodeIndex];
 
         float tmin = 0.0f, tmax = FLT_MAX;
-        if (!node.box.intersect(ray, tmin, tmax)) return closestHit;
+        if (!node.box.intersect(ray, tmin, tmax)) return closest;
 
+        // Feuille
         if (node.isLeaf()) {
             for (int triIndex : node.triIndices) {
                 const MeshTriangle& tri = triangles[triIndex];
-                Triangle triangle(vertices[tri.v[0]].position, vertices[tri.v[1]].position, vertices[tri.v[2]].position);
+                Triangle triangle(
+                    vertices[tri.v[0]].position,
+                    vertices[tri.v[1]].position,
+                    vertices[tri.v[2]].position);
+
                 RayTriangleIntersection hit = triangle.getIntersection(ray);
                 hit.tIndex = triIndex;
 
-                if (hit.intersectionExists && hit.t < closestHit.t)
-                    closestHit = hit;
+                if (hit.intersectionExists && hit.t < closest.t)
+                    closest = hit;
             }
-            return closestHit;
+            return closest;
         }
 
-        // On teste les AABB des enfants avant la récursion
-        float tminLeft = 0.0f, tmaxLeft = FLT_MAX;
-        float tminRight = 0.0f, tmaxRight = FLT_MAX;
-        bool hitLeft = (node.left >= 0) && bvhNodes[node.left].box.intersect(ray, tminLeft, tmaxLeft);
-        bool hitRight = (node.right >= 0) && bvhNodes[node.right].box.intersect(ray, tminRight, tmaxRight);
+        // Ordre de parcours selon le rayon
+        float origin = ray.origin()[node.axis];
+        float direction = ray.direction()[node.axis];
 
-        // Si aucune intersection, retourner
-        if (!hitLeft && !hitRight) return closestHit;
+        int firstChild = node.left;
+        int secondChild = node.right;
 
-        // Déterminer l'ordre de traversée (tester le plus proche en premier)
-        int firstChild = -1, secondChild = -1;
-        float secondTmin = FLT_MAX;
-        
-        if (hitLeft && hitRight) {
-            if (tminLeft < tminRight) {
-                firstChild = node.left;
-                secondChild = node.right;
-                secondTmin = tminRight;
-            } else {
-                firstChild = node.right;
-                secondChild = node.left;
-                secondTmin = tminLeft;
-            }
-        } else if (hitLeft) {
-            firstChild = node.left;
-        } else {
-            firstChild = node.right;
+        if (direction < 0.0f)
+            std::swap(firstChild, secondChild);
+
+        closest = intersectKDTree(ray, firstChild);
+
+        // Coupe du plan
+        float tPlane = (node.split - origin) / direction;
+
+        if (tPlane < closest.t) {
+            RayTriangleIntersection other =
+                intersectKDTree(ray, secondChild);
+
+            if (other.intersectionExists && other.t < closest.t)
+                closest = other;
         }
 
-        // Tester le premier enfant
-        if (firstChild >= 0) {
-            closestHit = intersectBVH(ray, firstChild);
-        }
-
-        // Tester le second enfant seulement si son AABB est plus proche que l'intersection trouvée
-        if (secondChild >= 0 && secondTmin < closestHit.t) {
-            RayTriangleIntersection secondHit = intersectBVH(ray, secondChild);
-            if (secondHit.intersectionExists && secondHit.t < closestHit.t) {
-                closestHit = secondHit;
-            }
-        }
-
-        return closestHit;
+        return closest;
     }
 
     RayTriangleIntersection intersect(const Ray& ray) const {
-        RayTriangleIntersection intersection = intersectBVH(ray, rootNodeIndex);
+        RayTriangleIntersection intersection = intersectKDTree(ray, rootNodeIndex);
 
         if (intersection.intersectionExists) {
             const MeshTriangle& tri = triangles[intersection.tIndex];

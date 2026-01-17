@@ -80,14 +80,14 @@ class Scenes {
             s.material.diffuse_material = Vec3(1., 0., 1.);
             s.material.specular_material = Vec3(1., 1., 1.);
             s.material.shininess = 16;
-            // ImageRGB img;
-            // load_ppm(img, "img/bernard.ppm");
-            // s.material.type = Material_Texture;
-            // TextureMap texture;
-            // texture.image = img;
-            // texture.wrapMode = SquareTexture_Cover;
-            // texture.mirrorMode = ImageMirror_Vertical;
-            // s.setTexture(texture);
+            ImageRGB img;
+            load_ppm(img, "img/bernard.ppm");
+            s.material.type = Material_Texture;
+            TextureMap texture;
+            texture.image = img;
+            texture.wrapMode = SquareTexture_Cover;
+            texture.mirrorMode = ImageMirror_Vertical;
+            s.setTexture(texture);
             scene.addSquare(s);
         }
 
@@ -165,20 +165,6 @@ class Scenes {
             scene.addSquare(s);
         }
 
-        // {  // MIRRORED middle
-        //     Square s;
-        //     s.setQuad(Vec3(-.9, -.9, 0.), Vec3(.9, 0, 0.), Vec3(0., .9, 0.), 2., 2.);
-        //     s.rotate_x(-20);
-        //     s.translate(Vec3(0., 0., 1.9));
-        //     s.build_arrays();
-        //     s.material.type = Material_Glass;
-        //     s.material.diffuse_material = Vec3(1.0, 1.0, 1.0);
-        //     s.material.specular_material = Vec3(1.0, 1.0, 1.0);
-        //     s.material.shininess = 16;
-        //     s.material.index_medium = 1.5;
-        //     scene.addSquare(s);
-        // }
-
         {  // MIRRORED Sphere
             Sphere s;
             s.m_center = Vec3(1.0, -1.25, 0.5);
@@ -216,6 +202,7 @@ class Scenes {
             mesh.material.shininess = 16;
             mesh.material.transparency = 1.0;
             mesh.material.index_medium = 1.8;
+            mesh.build_arrays();
             scene.addMesh(mesh);
         }
     }
@@ -224,8 +211,7 @@ class Scenes {
         scene.clearScene();
 
         {
-            scene.addLight(Vec3(-5, 5, 5), 2.5f, 2.f, LightType_Spherical,
-                           Vec3(1), false);
+            scene.addLight(Vec3(-5, 5, 5), 2.5f, 2.f, LightType_Spherical, Vec3(1), false);
         }
 
         {
@@ -234,6 +220,7 @@ class Scenes {
             mesh.material.diffuse_material = Vec3(1., 0., 0.);
             mesh.material.specular_material = Vec3(1., 0., 0.);
             mesh.material.shininess = 16;
+            mesh.build_arrays();
             scene.addMesh(mesh);
         }
     }
